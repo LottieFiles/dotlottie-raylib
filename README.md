@@ -2,9 +2,7 @@
 
 A Lottie/dotLottie animation component for Raylib. Drop the supplied `dlrl.c`/`dlrl.h` pair into your project and you can treat `.lottie` archives or raw Lottie JSON as animated sprites that sync with markers and respond to gameplay input.
 
-<video src="./demo.mp4" width="640" controls muted loop playsinline>
-  Your browser does not support embedded video. <a href="./demo.mp4">Download demo.mp4</a> instead.
-</video>
+<img src="./demo.gif" width="300"/>
 
 ## Quick start
 - Make sure you have Raylib 5.x headers/libs plus Clang or GCC.
