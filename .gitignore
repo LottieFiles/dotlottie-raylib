@@ -1,0 +1,11 @@
+# Build artifacts
+build/
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+*~
+
+# macOS metadata
+.DS_Store
