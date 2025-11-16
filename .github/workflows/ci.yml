@@ -18,13 +18,21 @@ jobs:
         run: |
           if [[ "$RUNNER_OS" == "Linux" ]]; then
             sudo apt-get update
-            sudo apt-get install -y build-essential libraylib-dev \
+            sudo apt-get install -y build-essential cmake git \
               libgl1-mesa-dev libglu1-mesa-dev libx11-dev \
               libxcursor-dev libxinerama-dev libxi-dev libxrandr-dev pkg-config
           else
             brew update
             brew install raylib
           fi
+
+      - name: Build raylib (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          git clone --depth 1 --branch 5.0 https://github.com/raysan5/raylib.git /tmp/raylib
+          cd /tmp/raylib
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/usr/local
+          sudo cmake --build build --config Release --target install
 
       - name: Build sample
         run: make build
