@@ -33,6 +33,11 @@ endif
 LIB_DIRS := -L$(DOTLOTTIE_LIB_DIR)
 RPATH_FLAGS := -Wl,-rpath,$(abspath $(DOTLOTTIE_LIB_DIR))
 
+ifneq ($(BREW_PREFIX),)
+LIB_DIRS += -L$(BREW_PREFIX)/lib
+RPATH_FLAGS += -Wl,-rpath,$(BREW_PREFIX)/lib
+endif
+
 LDLIBS := $(LIB_DIRS) -ldotlottie_player -lraylib
 LDFLAGS += $(RPATH_FLAGS)
 
