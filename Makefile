@@ -5,11 +5,7 @@ LDFLAGS ?=
 BUILD_DIR ?= build
 TARGET := $(BUILD_DIR)/example
 SOURCES := dlrl.c example.c
-INCLUDES := -I. -Ithird_party/dotlottie_player/include
-BREW_PREFIX ?= $(shell brew --prefix 2>/dev/null)
-ifneq ($(BREW_PREFIX),)
-INCLUDES += -I$(BREW_PREFIX)/include
-endif
+INCLUDES := -I. -Ithird_party/dotlottie_player/include -Ithird_party/raylib/include
 
 UNAME_S := $(shell uname -s)
 UNAME_M := $(shell uname -m)
@@ -25,13 +21,27 @@ DOTLOTTIE_ARCH := arm64
 endif
 
 DOTLOTTIE_LIB_DIR := third_party/dotlottie_player/lib/$(DOTLOTTIE_OS)/$(DOTLOTTIE_ARCH)
-DOTLOTTIE_LIB := $(wildcard $(DOTLOTTIE_LIB_DIR)/libdotlottie_player.*)
+DOTLOTTIE_LIB := $(firstword $(wildcard $(DOTLOTTIE_LIB_DIR)/libdotlottie_player.*))
 ifeq ($(strip $(DOTLOTTIE_LIB)),)
 $(error Missing dotLottie prebuilts for $(DOTLOTTIE_OS)/$(DOTLOTTIE_ARCH). Grab binaries from dotlottie_player releases.)
 endif
+ifeq ($(shell [ -e "$(DOTLOTTIE_LIB)" ] && echo ok),)
+$(error dotLottie library not found at $(DOTLOTTIE_LIB); ensure the binary exists.)
+endif
 
-LIB_DIRS := -L$(DOTLOTTIE_LIB_DIR)
-RPATH_FLAGS := -Wl,-rpath,$(abspath $(DOTLOTTIE_LIB_DIR))
+RAYLIB_OS := $(DOTLOTTIE_OS)
+RAYLIB_ARCH := $(DOTLOTTIE_ARCH)
+RAYLIB_LIB_DIR := third_party/raylib/lib/$(RAYLIB_OS)/$(RAYLIB_ARCH)
+RAYLIB_LIB := $(firstword $(wildcard $(RAYLIB_LIB_DIR)/libraylib.*))
+ifeq ($(strip $(RAYLIB_LIB)),)
+$(error Missing raylib prebuilts for $(RAYLIB_OS)/$(RAYLIB_ARCH). Place them in $(RAYLIB_LIB_DIR).)
+endif
+ifeq ($(shell [ -e "$(RAYLIB_LIB)" ] && echo ok),)
+$(error raylib library not found at $(RAYLIB_LIB); ensure the binary exists.)
+endif
+
+LIB_DIRS := -L$(DOTLOTTIE_LIB_DIR) -L$(RAYLIB_LIB_DIR)
+RPATH_FLAGS := -Wl,-rpath,$(abspath $(DOTLOTTIE_LIB_DIR)) -Wl,-rpath,$(abspath $(RAYLIB_LIB_DIR))
 
 LDLIBS := $(LIB_DIRS) -ldotlottie_player -lraylib
 LDFLAGS += $(RPATH_FLAGS)

@@ -5,7 +5,7 @@ Tiny glue that lets Raylib render `.lottie` archives or raw Lottie JSON as textu
 <img src="./demo.gif" width="320"/>
 
 ## Requirements
-- Raylib 5.x installed on your machine (headers + libs) and a C compiler (Clang or GCC). The Makefile assumes raylib is already available.
+- Raylib 5.x and a C compiler (Clang or GCC). Prebuilt raylib binaries/headers live in `third_party/raylib` for macOS (arm64) and Linux (x86_64); the Makefile links against them by default. Bring your own raylib for other OS/arch layouts.
 - dotLottie runtime: `third_party/dotlottie_player` includes headers and test prebuilts for macOS (arm64) and Linux (x86_64/arm64). For Android, iOS, Windows, or other platforms, grab the prebuilts from the dotlottie_player releases and drop them into the same `lib/<os>/<arch>` layout.
 - Assets: `.lottie` bundles alongside the executable (e.g., `super-man.lottie`). Avoid committing bulky test assets.
 
@@ -16,16 +16,16 @@ make run                  # runs with super-man.lottie
 make run ASSET=foo.lottie # run any .lottie or .json
 make clean                # wipe build/
 ```
-Homebrew include paths are auto-detected on macOS; adjust `INCLUDES` / `LIB_DIRS` in the Makefile if your raylib install lives elsewhere.
+Adjust `INCLUDES` / `LIB_DIRS` in the Makefile if you swap in your own raylib/dotLottie SDKs or install them outside the bundled layout.
 
 ## Prebuilts & Platforms
-- Bundled dotLottie binaries are for local testing only. Replace them with the correct `libdotlottie_player` from upstream releases for your target OS/arch (including Android/iOS), then rebuild with `make clean && make build`.
-- The Makefile picks a subdirectory of `third_party/dotlottie_player/lib/<os>/<arch>` based on your host. If nothing matches, it errors and points you at the releases.
-- Keep raylib installed through your system package manager or Homebrew; this repo does not vendor raylib.
+- Bundled raylib and dotLottie binaries are for local testing only. Replace them with the correct libraries from upstream releases for your target OS/arch (including Android/iOS), then rebuild with `make clean && make build`.
+- The Makefile picks subdirectories of `third_party/dotlottie_player/lib/<os>/<arch>` and `third_party/raylib/lib/<os>/<arch>` based on your host. If nothing matches, it errors and points you at the releases.
+- Raylib is looked up in `third_party/raylib/lib/<os>/<arch>`; drop in the right build if you’re on a different platform.
 
 ## Using It in Your Project
 1) Copy `dlrl.c` and `dlrl.h` into your project.
-2) Add `third_party/dotlottie_player/include` to your compiler include paths and `third_party/dotlottie_player/lib/<os>/<arch>` to your linker search paths.
+2) Add `third_party/dotlottie_player/include` and `third_party/raylib/include` to your compiler include paths; add the matching `third_party/dotlottie_player/lib/<os>/<arch>` and `third_party/raylib/lib/<os>/<arch>` to your linker search paths.
 3) Link with `-ldotlottie_player -lraylib` plus platform libs (OpenGL/Cocoa on macOS, X11/GL/pthread on Linux).
 4) Drive the player inside your Raylib loop:
 ```c

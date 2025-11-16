@@ -1,11 +1,11 @@
 # dotLottie-raylib Usage
 
 ## Setup
-- Install raylib 5.x on your system (package manager or Homebrew). This repo does not vendor raylib.
+- Use the bundled raylib and dotLottie prebuilts in `third_party/raylib` and `third_party/dotlottie_player` (macOS arm64, Linux x86_64 by default). Replace them with the correct `lib`/`include` for your target as needed.
 - Copy `dlrl.c` / `dlrl.h` into your project.
-- Add `third_party/dotlottie_player/include` to compiler includes and `third_party/dotlottie_player/lib/<os>/<arch>` to linker search paths.
+- Add `third_party/dotlottie_player/include` and `third_party/raylib/include` to compiler includes; add `third_party/dotlottie_player/lib/<os>/<arch>` and `third_party/raylib/lib/<os>/<arch>` to linker search paths.
 - Link flags: `-ldotlottie_player -lraylib` plus platform libs (macOS: `-framework Cocoa -framework IOKit -framework OpenGL`; Linux: `-lGL -lm -lpthread -ldl -lrt -lX11`).
-- Android/iOS/other targets: fetch the matching dotlottie_player prebuilts from the upstream releases and drop them into the `lib/<os>/<arch>` layout.
+- Android/iOS/other targets: fetch matching dotlottie_player/raylib prebuilts from their releases and drop them into the `lib/<os>/<arch>` layout.
 
 ## Creating a Player
 ```c
