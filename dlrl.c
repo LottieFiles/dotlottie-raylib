@@ -18,6 +18,10 @@ struct dlrl_Player {
     struct DotLottiePlayer* core;
     Texture2D tex;
     int texW, texH;
+    uint32_t requestedW;
+    uint32_t requestedH;
+    bool autoWidth;
+    bool autoHeight;
     float time;
     float duration;      
     float assetDuration; 
@@ -36,6 +40,7 @@ struct dlrl_Player {
     dlrl_Marker* markers;
     int markerCount;
     int activeMarker;
+    float direction;
 };
 
 static void fit_rect(int srcW, int srcH, Rectangle dst, dlrl_Fit fit, Vector2 align, Rectangle* out)
@@ -204,6 +209,7 @@ static dlrl_Player* alloc_player(void)
 
 static bool create_texture(dlrl_Player* p)
 {
+    if (!p) return false;
     Image img = {
         .data = NULL,
         .width = p->texW,
@@ -213,6 +219,21 @@ static bool create_texture(dlrl_Player* p)
     };
     p->tex = LoadTextureFromImage(img); 
     return (p->tex.id != 0);
+}
+
+static bool recreate_texture(dlrl_Player* p, uint32_t w, uint32_t h)
+{
+    if (!p) return false;
+    if ((int)w == p->texW && (int)h == p->texH && p->tex.id != 0) {
+        return true;
+    }
+    if (p->tex.id) {
+        UnloadTexture(p->tex);
+        p->tex = (Texture2D){0};
+    }
+    p->texW = (int)w;
+    p->texH = (int)h;
+    return create_texture(p);
 }
 
 static bool ends_with_ci(const char* str, const char* suffix)
@@ -299,6 +320,10 @@ dlrl_Player* dlrl_LoadDotLottieFile(const char* path, const dlrl_Config* cfg)
     if (!p) { dotlottie_destroy(core); return NULL; }
     p->core = core;
     p->texW = (int)targetW; p->texH = (int)targetH;
+    p->requestedW = requestedW;
+    p->requestedH = requestedH;
+    p->autoWidth = (requestedW == 0);
+    p->autoHeight = (requestedH == 0);
     p->assetDuration = duration;
     p->duration = duration;
     p->totalFrames = totalFrames > 0.f ? (int)totalFrames : 1;
@@ -311,6 +336,8 @@ dlrl_Player* dlrl_LoadDotLottieFile(const char* path, const dlrl_Config* cfg)
     p->fit = cfg ? cfg->fit : DLRL_FIT_CONTAIN;
     p->align = cfg ? cfg->align : (Vector2){0.5f, 0.5f};
     p->bg = cfg ? cfg->background : BLANK;
+    p->direction = (p->mode == DLRL_MODE_REVERSE || p->mode == DLRL_MODE_REVERSE_BOUNCE) ? -1.f : 1.f;
+    if (p->speed < 0.f) { p->direction = -p->direction; p->speed = -p->speed; }
 
     p->natural = (Vector2){naturalW, naturalH};
     p->markers = NULL;
@@ -337,7 +364,17 @@ dlrl_Player* dlrl_LoadLottieJSON(const char* json, size_t len, const dlrl_Config
     uint32_t requestedH = (uint32_t)(cfg && cfg->height > 0 ? cfg->height : 0);
     uint32_t loadW = requestedW ? requestedW : DLRL_FALLBACK_SURFACE;
     uint32_t loadH = requestedH ? requestedH : DLRL_FALLBACK_SURFACE;
-    if (dotlottie_load_animation_data(core, json, loadW, loadH) != DOTLOTTIE_SUCCESS) {
+    char* buf = (char*)MemAlloc(len + 1);
+    if (!buf) {
+        dotlottie_destroy(core);
+        return NULL;
+    }
+    memcpy(buf, json, len);
+    buf[len] = '\0';
+
+    int status = dotlottie_load_animation_data(core, buf, loadW, loadH);
+    MemFree(buf);
+    if (status != DOTLOTTIE_SUCCESS) {
         dotlottie_destroy(core);
         return NULL;
     }
@@ -360,6 +397,10 @@ dlrl_Player* dlrl_LoadLottieJSON(const char* json, size_t len, const dlrl_Config
     if (!p) { dotlottie_destroy(core); return NULL; }
     p->core = core;
     p->texW = (int)targetW; p->texH = (int)targetH;
+    p->requestedW = requestedW;
+    p->requestedH = requestedH;
+    p->autoWidth = (requestedW == 0);
+    p->autoHeight = (requestedH == 0);
     p->assetDuration = duration;
     p->duration = duration;
     p->totalFrames = totalFrames > 0.f ? (int)totalFrames : 1;
@@ -372,6 +413,8 @@ dlrl_Player* dlrl_LoadLottieJSON(const char* json, size_t len, const dlrl_Config
     p->fit = cfg ? cfg->fit : DLRL_FIT_CONTAIN;
     p->align = cfg ? cfg->align : (Vector2){0.5f, 0.5f};
     p->bg = cfg ? cfg->background : BLANK;
+    p->direction = (p->mode == DLRL_MODE_REVERSE || p->mode == DLRL_MODE_REVERSE_BOUNCE) ? -1.f : 1.f;
+    if (p->speed < 0.f) { p->direction = -p->direction; p->speed = -p->speed; }
 
     p->natural = (Vector2){naturalW, naturalH};
     p->markers = NULL;
@@ -404,13 +447,28 @@ void dlrl_Stop(dlrl_Player* p){
     dotlottie_stop(p->core);
     p->playing=false;
     p->time=0.f;
+    p->direction = (p->mode == DLRL_MODE_REVERSE || p->mode == DLRL_MODE_REVERSE_BOUNCE) ? -1.f : 1.f;
     dotlottie_set_frame(p->core, 0.f);
 }
 bool dlrl_IsPlaying(const dlrl_Player* p){ return p && p->playing; }
 
-void dlrl_SetSpeed(dlrl_Player* p, float speed){ if(p) { p->speed = speed; } }
+void dlrl_SetSpeed(dlrl_Player* p, float speed){
+    if (!p) return;
+    if (speed < 0.f) {
+        p->direction = -1.f;
+        p->speed = -speed;
+    } else {
+        p->speed = speed;
+        if (p->direction == 0.f) p->direction = 1.f;
+    }
+}
 void dlrl_SetLoop(dlrl_Player* p, bool loop){ if(p) p->loop = loop; }
-void dlrl_SetMode(dlrl_Player* p, dlrl_Mode m){ if(p) p->mode = m; }
+void dlrl_SetMode(dlrl_Player* p, dlrl_Mode m){
+    if(!p) return;
+    p->mode = m;
+    p->direction = (m == DLRL_MODE_REVERSE || m == DLRL_MODE_REVERSE_BOUNCE) ? -1.f : 1.f;
+    if (p->direction == 0.f) p->direction = 1.f;
+}
 
 static float wrap_time(dlrl_Player* p, float t)
 {
@@ -426,16 +484,23 @@ void dlrl_Update(dlrl_Player* p, float dt)
 {
     if (!p) return;
     if (p->playing) {
-        float s = p->speed;
+        float dir = (p->direction == 0.f) ? 1.f : p->direction;
         switch (p->mode) {
-            case DLRL_MODE_FORWARD: break;
-            case DLRL_MODE_REVERSE: s = -s; break;
+            case DLRL_MODE_FORWARD:
+                dir = 1.f;
+                break;
+            case DLRL_MODE_REVERSE:
+                dir = -1.f;
+                break;
             case DLRL_MODE_BOUNCE:
             case DLRL_MODE_REVERSE_BOUNCE:
-                                    if ((p->time <= 0.f && s < 0.f) || (p->time >= p->duration && s > 0.f)) s = -s;
-                                    p->speed = s; 
-                                    break;
+                if ((p->time <= 0.f && dir < 0.f) || (p->time >= p->duration && dir > 0.f)) {
+                    dir = -dir;
+                }
+                break;
         }
+        p->direction = (dir == 0.f) ? 1.f : dir;
+        float s = p->speed * p->direction;
         p->time = wrap_time(p, p->time + dt * s);
     }
 
@@ -490,14 +555,27 @@ bool dlrl_SetTheme(dlrl_Player* p, const char* theme_id)
 bool dlrl_SetAnimation(dlrl_Player* p, const char* animation_id)
 {
     if (!p || !animation_id) return false;
-    if (dotlottie_load_animation(p->core, animation_id, (uint32_t)p->texW, (uint32_t)p->texH)
-            != DOTLOTTIE_SUCCESS) {
+    uint32_t loadW = p->requestedW ? p->requestedW : DLRL_FALLBACK_SURFACE;
+    uint32_t loadH = p->requestedH ? p->requestedH : DLRL_FALLBACK_SURFACE;
+    if (dotlottie_load_animation(p->core, animation_id, loadW, loadH) != DOTLOTTIE_SUCCESS) {
         return false;
     }
     float naturalW = 0.f, naturalH = 0.f, duration = 0.f, totalFrames = 0.f;
     dotlottie_animation_size(p->core, &naturalW, &naturalH);
     dotlottie_duration(p->core, &duration);
     dotlottie_total_frames(p->core, &totalFrames);
+
+    uint32_t targetW = p->requestedW ? p->requestedW : (naturalW > 0.f ? (uint32_t)naturalW : loadW);
+    uint32_t targetH = p->requestedH ? p->requestedH : (naturalH > 0.f ? (uint32_t)naturalH : loadH);
+
+    if ((targetW != loadW || targetH != loadH) &&
+            dotlottie_resize(p->core, targetW, targetH) != DOTLOTTIE_SUCCESS) {
+        return false;
+    }
+    if (!recreate_texture(p, targetW, targetH)) {
+        return false;
+    }
+
     p->assetDuration = duration;
     p->duration = duration;
     p->totalFrames = totalFrames > 0.f ? (int)totalFrames : 1;
