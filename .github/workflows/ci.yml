@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - name: Install dependencies
         run: |
@@ -25,18 +27,22 @@ jobs:
             sudo apt-get install -y build-essential cmake git \
               libgl1-mesa-dev libglu1-mesa-dev libx11-dev \
               libxcursor-dev libxinerama-dev libxi-dev libxrandr-dev pkg-config
-          else
-            brew update
-            brew install raylib
           fi
 
-      - name: Build raylib (Linux)
-        if: runner.os == 'Linux'
+      - name: Verify prebuilts
         run: |
-          git clone --depth 1 --branch 5.0 https://github.com/raysan5/raylib.git /tmp/raylib
-          cd /tmp/raylib
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/usr/local
-          sudo cmake --build build --config Release --target install
+          os=$(uname -s)
+          case "$os" in
+            Darwin) os_dir=macos ;;
+            Linux) os_dir=linux ;;
+            *) echo "Unsupported OS: $os" && exit 1 ;;
+          esac
+          arch=$(uname -m)
+          if [[ "$arch" == "aarch64" ]]; then
+            arch=arm64
+          fi
+          ls third_party/raylib/lib/$os_dir/$arch
+          ls third_party/dotlottie_player/lib/$os_dir/$arch
 
       - name: Build sample
         run: make build
